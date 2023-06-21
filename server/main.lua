@@ -41,7 +41,7 @@ RegisterServerEvent('sayer-fishing:receiveFish', function(cabin, house)
 		luck = math.random(1,100)
 		if luck <= randomItem.Chance then
 			Player.Functions.AddItem(randomItem.Name,1)
-			if Config.Debug then print("Item = "..randomItem.Name.." / XP = "..randomItem.XPGive.." !")
+			if Config.Debug then print("Item = "..randomItem.Name.." / XP = "..randomItem.XPGive.." !") end
 			TriggerClientEvent('QBCore:Notify', src, "You Caught a "..QBCore.Shared.Items[randomItem.Name].label.."!", 'success')
 			if Config.UseLevelSystem then
 				TriggerEvent('sayer-fishing:AddXP',src,randomItem.XPGive)
