@@ -1,5 +1,9 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
+local function DebugCode(msg)
+	if Config.Debug then print(msg) end
+end
+
 QBCore.Functions.CreateCallback('sayer-fishing:GetItemData', function(source, cb, itemName)
 	local retval = false
 	local Player = QBCore.Functions.GetPlayer(source)
@@ -12,47 +16,80 @@ QBCore.Functions.CreateCallback('sayer-fishing:GetItemData', function(source, cb
 	cb(retval)
 end)
 
-for k,v in pairs(Config.FishingItems) do
-	QBCore.Functions.CreateUseableItem(k, function(source, item)
-    	local Player = QBCore.Functions.GetPlayer(source)
-		if v.Type == 'rod' then
-			if Config.JobRequired.Enable then
-				if Player.PlayerData.job == Config.JobRequired.JobCode then
-    				TriggerClientEvent('sayer-fishing:tryToFish', source)
+CreateThread(function()
+	for k,v in pairs(Config.FishingItems) do
+		QBCore.Functions.CreateUseableItem(k, function(source, item)
+			local src = source
+	    	local Player = QBCore.Functions.GetPlayer(src)
+			if v.Type == 'rod' then
+				if Config.JobRequired.Enable then
+					if Player.PlayerData.job == Config.JobRequired.JobCode then
+	    				TriggerClientEvent('sayer-fishing:tryToFish', source, k)
+					else
+						TriggerClientEvent('QBCore:Notify', src, "You Need To Be A ..."..Config.JobRequired.Label.." to use this equipment")
+					end
 				else
-					TriggerClientEvent('QBCore:Notify', src, "You Need To Be A ..."..Config.JobRequired.Label.." to use this equipment")
+					TriggerClientEvent('sayer-fishing:tryToFish', source, k)
 				end
-			else
-				TriggerClientEvent('sayer-fishing:tryToFish', source)
+			elseif v.Type == 'bait' then
+				if Config.JobRequired.Enable then
+					if Player.PlayerData.job == Config.JobRequired.JobCode then
+	    				TriggerClientEvent('sayer-fishing:BaitRod', source, k)
+					else
+						TriggerClientEvent('QBCore:Notify', src, "You Need To Be A ..."..Config.JobRequired.Label.." to use this equipment")
+					end
+				else
+					TriggerClientEvent('sayer-fishing:BaitRod', source, k)
+				end
 			end
-		end
-	end)
-end
-
-
-RegisterServerEvent('sayer-fishing:receiveFish', function(cabin, house)
-    local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    local luck = 0
-    local itemCount = math.random(Config.MinItemRewards,Config.MaxItemRewards)
-
-    for i = 1, itemCount, 1 do
-        local randomItem = Config.FishingRewards[math.random(1,#Config.FishingRewards)]
-		luck = math.random(1,100)
-		if luck <= randomItem.Chance then
-			Player.Functions.AddItem(randomItem.Name,1)
-			if Config.Debug then print("Item = "..randomItem.Name.." / XP = "..randomItem.XPGive.." !") end
-			TriggerClientEvent('QBCore:Notify', src, "You Caught a "..QBCore.Shared.Items[randomItem.Name].label.."!", 'success')
-			if Config.UseLevelSystem then
-				TriggerEvent('sayer-fishing:AddXP',src,randomItem.XPGive)
-			end
-		else
-			TriggerClientEvent('QBCore:Notify', src, "You didnt catch the fish")
-		end
+		end)
 	end
 end)
 
-RegisterNetEvent('sayer-fishing:RemoveItem', function (item,amount)
+RegisterNetEvent('sayer-fishing:OpenFishShop',function()
+	if Config.ShopStyle == 'qb' then
+		local itemTable = Config.Shops.EquipmentStock.items
+		exports['qb-inventory']:CreateShop({
+			name = 'sayerfishshop',
+			label = Config.Shops.EquipmentStock.label,
+			slots = #itemTable,
+			items = itemTable
+		})
+		exports['qb-inventory']:OpenShop(source, 'sayerfishshop')
+	end
+end)
+
+RegisterNetEvent('sayer-fishing:receiveFish', function(rodItem, baitItem)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+
+    local luck = math.random(0,100)
+	if Config.FishingItems[rodItem] ~= nil then
+		if Config.FishingItems[rodItem].Type == 'rod' then
+			if Config.FishingItems[rodItem].CatchMultiplier ~= nil then
+				luck = luck - Config.FishingItems[rodItem].CatchMultiplier
+			end
+		end
+	end
+
+	local randomItem = Config.FishingItems[baitItem].CatchList[math.random(1,#Config.FishingItems[baitItem].CatchList)]
+	if not Config.FishingRewards[randomItem] then print("ERROR Item "..randomItem.." does not exist in Config.FishingRewards") return end
+	if luck <= Config.FishingRewards[randomItem].Chance then
+		Player.Functions.AddItem(randomItem,1)
+		TriggerClientEvent('qb-inventory:client:ItemBox', src, QBCore.Shared.Items[randomItem], 'add')
+		DebugCode("Item = "..randomItem.." / XP = "..Config.FishingRewards[randomItem].XPGive.." !")
+		TriggerClientEvent('QBCore:Notify', src, "You Caught a "..QBCore.Shared.Items[randomItem].label.."!", 'success', 5000)
+
+		if Config.UseLevelSystem then
+			TriggerEvent('sayer-fishing:AddXP',src,Config.FishingRewards[randomItem].XPGive)
+		end
+
+	else
+		TriggerClientEvent('QBCore:Notify', src, "Bait returned empty", 'error', 5000)
+	end
+end)
+
+RegisterNetEvent('sayer-fishing:RemoveItem', function(item,amount)
 	local Player = QBCore.Functions.GetPlayer(source)
 	Player.Functions.RemoveItem(item, amount)
 end)

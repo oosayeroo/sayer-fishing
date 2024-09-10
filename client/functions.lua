@@ -1,45 +1,90 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local DoneBars = 0
+local SelectedBait = nil
+local isFishing = false
 
-TryToFish = function()
+local function IsInZone(tempCoords)
+    local retval = false
+    if Config.FishAnywhere then
+        retval = true
+    else
+        for k,v in pairs(Config.FishingZones) do
+            if #(tempCoords - vec3(v.Coords.x,v.Coords.y,v.Coords.z)) < v.Radius then
+                retval = true
+                break
+            end
+        end
+    end
+    return retval
+end
+
+local function HasFishingBait(bait)
+    local retval = false
+    for k,v in pairs(Config.FishingItems) do
+        if v.Type == 'bait' then
+            if k == bait then
+                if QBCore.Functions.HasItem(k) then
+                    retval = true
+                    break
+                end
+            end
+        end
+    end
+    Wait(1000)
+    return retval
+end
+
+function TryToFish(rod)
     if IsPedSwimming(cachedData["ped"]) then return QBCore.Functions.Notify("You can't be swimming and fishing at the same time.", "error") end 
     if IsPedInAnyVehicle(cachedData["ped"]) then return QBCore.Functions.Notify("You need to exit your vehicle to start fishing.", "error") end 
+    local tempCoords = GetEntityCoords(cachedData["ped"])
     local waterValidated, castLocation = IsInWater()
 
     if waterValidated then
         local fishingRod = GenerateFishingRod(cachedData["ped"])
 
-        CastBait(fishingRod, castLocation)
+        if IsInZone(tempCoords) then
+            CastBait(fishingRod, castLocation, false, rod)
+        else
+            QBCore.Functions.Notify("You need to be in a fishing zone", "primary")
+            DeleteEntity(fishingRod)
+        end
     else
         QBCore.Functions.Notify("You need to aim towards the water to fish", "primary")
     end
 end
 
-local isFishing = false
-CastBait = function(rodHandle, castLocation)
+RegisterNetEvent('sayer-fishing:BaitRod',function(bait)
+    if not isFishing then return end
+    if not Config.FishingItems[bait] then print("Incorrect Item") return end
+    if Config.FishingItems[bait].Type ~= 'bait' then print("Incorrect Item") return end
+    SelectedBait = bait
+end)
+
+function CastBait(rodHandle, castLocation, notFirst, rod)
     if isFishing then return end
     isFishing = true
 
     local startedCasting = GetGameTimer()
 
-    if not HasFishingBait() then
-        QBCore.Functions.Notify('You don\'t have any bait!', 'error')
+    if not notFirst then
+        QBCore.Functions.Notify('Please select your bait')
+    end
+
+    repeat
+        Wait(10)
+    until SelectedBait ~= nil
+
+    if not HasFishingBait(SelectedBait) then
+        if not notFirst then
+            QBCore.Functions.Notify('You don\'t have any bait!', 'error')
+        else
+            QBCore.Functions.Notify('Ran out of bait')
+        end
+        SelectedBait = nil
 
         isFishing = false
         return DeleteEntity(rodHandle)
-    end
-
-    while not IsControlJustPressed(0, 47) do
-        Wait(5)
-
-        ShowHelpNotification("Cast your line by pressing ~INPUT_DETONATE~")
-
-        if GetGameTimer() - startedCasting > Config.PutRodAwayTime*1000 then
-            QBCore.Functions.Notify("You Put The Rod Away.", "primary")
-
-            isFishing = false
-            return DeleteEntity(rodHandle)
-        end
     end
 
     PlayAnimation(cachedData["ped"], "mini@tennis", "forehand_ts_md_far", {
@@ -55,16 +100,17 @@ CastBait = function(rodHandle, castLocation)
     })
 
     local startedBaiting = GetGameTimer()
-    local randomBait = math.random(2000, 4000)
+    local randomBait = math.random(Config.CatchTime.Min, Config.CatchTime.Max)
+    local realBaitTime = randomBait * 1000
 
-    QBCore.Functions.Notify("Waiting for a fish to bite...", "success", 10000)
-    TriggerServerEvent('sayer-fishing:RemoveItem','fishingbait',1)
+    QBCore.Functions.Notify("Waiting for a fish to bite...", "success", 5000)
+    TriggerServerEvent('sayer-fishing:RemoveItem',SelectedBait,1)
 
     local interupted = false
 
     Wait(1000)
 
-    while GetGameTimer() - startedBaiting < randomBait do
+    while GetGameTimer() - startedBaiting < realBaitTime do
         Wait(5)
 
         if not IsEntityPlayingAnim(cachedData["ped"], "amb@world_human_stand_fishing@idle_a", "idle_c", 3) then
@@ -80,30 +126,28 @@ CastBait = function(rodHandle, castLocation)
         ClearPedTasks(cachedData["ped"])
 
         isFishing = false
-        CastBait(rodHandle, castLocation)
+        CastBait(rodHandle, castLocation, true, rod)
         return DeleteEntity(rodHandle)
     end
 
-    local caughtFish = TryToCatchFish()
-    if Config.Debug then print(caughtFish) end
-
-    ClearPedTasks(cachedData["ped"])
-
-    if caughtFish == true then
-        TriggerServerEvent("sayer-fishing:receiveFish", castLocation, function(received) end)
-        TriggerServerEvent('hud:server:RelieveStress', 1)
+    if TryToCatchFish() then
+        TriggerServerEvent("sayer-fishing:receiveFish", rod, SelectedBait)
+        if Config.FishingRelievesStress then
+            TriggerServerEvent('hud:server:RelieveStress', 1)
+        end
     else
         QBCore.Functions.Notify("The fish got loose.", "error")
     end
-    
+
+    ClearPedTasks(cachedData["ped"])
     isFishing = false
-    CastBait(rodHandle, castLocation)
+    CastBait(rodHandle, castLocation,true, rod)
     return DeleteEntity(rodHandle)
 end
 
 function TryToCatchFish()
     local gamedone = false
-    if Config.MiniGame.Script == 'ps-ui' then
+    if Config.MiniGame == 'ps-ui' then
         exports['ps-ui']:Circle(function(success)
             if success then
                 gamedone = true
@@ -111,7 +155,8 @@ function TryToCatchFish()
                 gamedone = false
             end
         end, Config.PSUI.NumberOfCircles, Config.PSUI.MiniGameTime) -- NumberOfCircles, MS
-    elseif Config.MiniGame.Script == 'qb-skillbar' then
+
+    elseif Config.MiniGame == 'qb-skillbar' then
         local Skillbar = exports['qb-skillbar']:GetSkillbarObject()
         local skilloptions = Config.SkillBar
         local NeededBars = skilloptions.NumberOfBars
@@ -135,7 +180,8 @@ function TryToCatchFish()
             DoneBars = 0
             gamedone = false
         end)
-    elseif Config.MiniGame.Script == 'boii-ui' then
+
+    elseif Config.MiniGame == 'boii-ui' then
         local options = Config.BOIIUI
         exports['boii_ui']:skill_circle(options.style --[[style]], options.Duration --[[duration]], false --[[allow dead]], {}, function(success) --[[callback]]
             if success then
@@ -148,7 +194,7 @@ function TryToCatchFish()
     return gamedone
 end
 
-IsInWater = function()
+function IsInWater()
     local startedCheck = GetGameTimer()
     local ped = cachedData["ped"]
     local pedPos = GetEntityCoords(ped)
@@ -174,7 +220,7 @@ IsInWater = function()
     return fishInWater, fishInWater and vector3(forwardPos["x"], forwardPos["y"], waterHeight) or false
 end
 
-GenerateFishingRod = function(ped)
+function GenerateFishingRod(ped)
     local pedPos = GetEntityCoords(ped)
     local fishingRodHash = `prop_fishing_rod_01`
     WaitForModel(fishingRodHash)
@@ -184,7 +230,7 @@ GenerateFishingRod = function(ped)
     return rodHandle
 end
 
-PlayAnimation = function(ped, dict, anim, settings)
+function PlayAnimation(ped, dict, anim, settings)
 	if dict then
         CreateThread(function()
             RequestAnimDict(dict)
@@ -232,7 +278,7 @@ PlayAnimation = function(ped, dict, anim, settings)
 	end
 end
 
-WaitForModel = function(model)
+function WaitForModel(model)
     if not IsModelValid(model) then
         return
     end
@@ -244,25 +290,4 @@ WaitForModel = function(model)
 	while not HasModelLoaded(model) do
 		Wait(0)
 	end
-end
-
-ShowHelpNotification = function(msg, thisFrame, beep, duration)
-	AddTextEntry('qbHelpNotification', msg)
-
-	if thisFrame then
-		DisplayHelpTextThisFrame('qbHelpNotification', false)
-	else
-		if beep == nil then beep = true end
-		BeginTextCommandDisplayHelp('qbHelpNotification')
-		EndTextCommandDisplayHelp(0, false, beep, duration or -1)
-	end
-end
-
-function HasFishingBait()
-    local rtval = false
-    if QBCore.Functions.HasItem('fishingbait') then
-        rtval = true
-    end
-    Wait(1000)
-    return rtval
 end

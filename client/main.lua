@@ -1,10 +1,7 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
 cachedData = {}
-local JobBusy = false
 TargetPed = {}
-
--- function SellFish()
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     PlayerIdentifier = QBCore.Functions.GetPlayerData().citizenid
@@ -40,7 +37,7 @@ CreateThread(function()
             FreezeEntityPosition(entity,true)
             SetBlockingOfNonTemporaryEvents(entity,true)
 
-            TargetPed["FishingShop"..k] =
+            TargetPed["FishingShop_equipment"..k] =
             exports['qb-target']:AddTargetEntity(entity,{
                 options = {{icon = "fas fa-sack-dollar",label = "Fishing Shop",action = function() OpenFishShop() end,},},
                 distance = 2.5,
@@ -50,19 +47,16 @@ CreateThread(function()
 end)
 
 function OpenFishShop()
-	if Config.ShopStyle == 'qb' then
-		TriggerServerEvent("inventory:server:OpenInventory", "shop", "fishing", Config.Shops.Stock)
-	elseif Config.ShopStyle == 'jim' then
-		TriggerServerEvent("jim-shops:ShopOpen", "shop", "fishing", Config.Shops.Stock)
+	if Config.ShopStyle == 'jim' then
+		TriggerServerEvent("jim-shops:ShopOpen", "shop", "fishing", Config.Shops.EquipmentStock)
+	else
+		TriggerServerEvent('sayer-fishing:OpenFishShop')
 	end
 end
 
-RegisterNetEvent("sayer-fishing:tryToFish", function()
-	TryToFish() 
-end)
 
-RegisterNetEvent("sayer-fishing:calculatedistances", pos, function()
-
+RegisterNetEvent("sayer-fishing:tryToFish", function(rod)
+	TryToFish(rod) 
 end)
 
 CreateThread(function()

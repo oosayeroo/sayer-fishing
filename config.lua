@@ -1,19 +1,89 @@
 Config = {}
 
 Config.Debug = false
-Config.JobBusy = false
+
 Config.JobRequired = {
     Enable = false,
     JobCode = 'fisherman',
     Label = "FisherMan",
 }
 
-Config.PutRodAwayTime = 10
-
-Config.MiniGame = {
-    Script = 'ps-ui',
-    --Supports 'ps-ui'/'qb-skillbar'/'boii-ui'
+Config.FishAnywhere = true -- if true will ignore the below fishingzones
+Config.FishingZones = { --ignored if Config.FishAnywhere = true
+    {Coords = vector3(-198.2, 794.38, 198.11),Radius = 20.0},
 }
+
+Config.FishingRelievesStress = true
+Config.CatchTime = {Min = 5,Max = 10} --how long from baiting rod to getting a "Bite"
+Config.PutRodAwayTime = 60 --how many seconds of being idle before rod is put away
+
+Config.FishingItems = {
+    ['fishingrod'] = {
+        Type = 'rod', --using 'rod' means you can use this item as fishing rod
+        CatchMultiplier = 20, --in % so 20 mulitplier would mean a 20% increase in chance of catching the fish
+    },
+    ['fishingbait'] = {
+        Type = 'bait', --using 'bait' means you can use this item as bait
+        CatchList = { --items from Config.FishingRewards below
+            "fish",           
+            "stripedbass",    
+            "bluefish",       
+            "salmon",         
+            "redfish",        
+        },
+    },
+    ['fishingbait2'] = {
+        Type = 'bait', 
+        CatchList = {  
+            "pacifichalibut", 
+            "goldfish",       
+            "largemouthbass", 
+            "catfish",        
+        },
+    },
+    ['fishingbait3'] = {
+        Type = 'bait',
+        CatchList = { 
+            "tigersharkmeat", 
+            "stingraymeat",   
+            "killerwhalemeat",
+        },
+    },
+}
+
+Config.FishingRewards = {
+    ["fish"] =            {Chance = 90,     XPGive = 1},
+    ["stripedbass"] =     {Chance = 70,     XPGive = 1},
+    ["bluefish"] =        {Chance = 70,     XPGive = 1},
+    ["salmon"] =          {Chance = 70,     XPGive = 1},
+    ["redfish"] =         {Chance = 60,     XPGive = 1},
+    ["pacifichalibut"] =  {Chance = 60,     XPGive = 1},
+    ["goldfish"] =        {Chance = 60,     XPGive = 1},
+    ["largemouthbass"] =  {Chance = 50,     XPGive = 1},
+    ["catfish"] =         {Chance = 50,     XPGive = 1},
+    ["tigersharkmeat"] =  {Chance = 30,     XPGive = 1},
+    ["stingraymeat"] =    {Chance = 30,     XPGive = 1},
+    ["killerwhalemeat"] = {Chance = 100,     XPGive = 1},
+}
+
+Config.ShopStyle = 'qb' --supports 'qb'/'jim'
+Config.Shops = {
+    Peds = {
+        {Enable = true,Model = 'a_m_m_hillbilly_01',Coords = vector4(1348.36, 4317.34, 38.04, 83.71)},
+    },
+    EquipmentStock = {
+        label = "Fishing Shop",
+        slots = 2,
+        items = {
+            [1]  =  {name = "fishingrod",      price = 1,   amount = 50,    info = {},  type = "item",  slot = 1,},
+            [2]  =  {name = "fishingbait",     price = 1,   amount = 50,    info = {},  type = "item",  slot = 2,},
+        }
+    }
+}
+
+Config.MiniGame = 'ps-ui' --configure in client/functions.lua TryToCatchFish function
+    
+-- some example stuff done in config. will work if you use either script
 --ps-ui settings
 Config.PSUI = {
     NumberOfCircles = 2,
@@ -32,53 +102,10 @@ Config.BOIIUI = {
     Duration = 25,
 }
 
-Config.MinItemRewards = 1 --catch between 1 or 2 fish
-Config.MaxItemRewards = 2
+Config.UseLevelSystem = false
 
-Config.FishingItems = {
-    ['fishingrod'] = {
-        Type = 'rod', --using 'rod' means you can use this item as fishing rod
-        Price = 200,
-    },
-    ['fishingbait'] = {
-        Type = 'bait',
-        Price = 10,
-    },
-}
-
-Config.FishingRewards = {
-    {Name = "fish",             Chance = 90,    XPGive = 1},
-    {Name = "stripedbass",      Chance = 70,    XPGive = 1},
-    {Name = "bluefish",         Chance = 70,    XPGive = 1},
-    {Name = "salmon",           Chance = 70,    XPGive = 1},
-    {Name = "redfish",          Chance = 60,    XPGive = 1},
-    {Name = "pacifichalibut",   Chance = 60,    XPGive = 1},
-    {Name = "goldfish",         Chance = 60,    XPGive = 1},
-    {Name = "largemouthbass",   Chance = 50,    XPGive = 1},
-    {Name = "catfish",          Chance = 50,    XPGive = 1},
-    {Name = "tigersharkmeat",   Chance = 30,    XPGive = 1},
-    {Name = "stingraymeat",     Chance = 30,    XPGive = 1},
-    {Name = "killerwhalemeat",  Chance = 20,    XPGive = 1},
-}
-
-Config.ShopStyle = 'qb' --supports 'qb'/'jim'
-Config.Shops = {
-    Peds = {
-        {Enable = true,Model = 'a_m_m_hillbilly_01',Coords = vector4(1348.36, 4317.34, 37.04, 83.71)},
-    },
-    Stock = {
-        label = "Fishing Shop",
-        slots = 2,
-        items = {
-            [1]  =  {name = "fishingrod",      price = 1,   amount = 50,    info = {},  type = "item",  slot = 1,},
-            [2]  =  {name = "fishingbait",     price = 1,   amount = 50,    info = {},  type = "item",  slot = 2,},
-        }
-    }
-}
-
-Config.DoubleXP = false --multiplies the xp given by 2 so you dont have to change lots of values
+Config.DoubleXP = true --multiplies the xp given by 2 so you dont have to change lots of values
 Config.DoubleLevelRewards = false --multiplies the reward given by 2 so you dont have to change lots of values
-Config.UseLevelSystem = true
 Config.Levels = {
     [1] = {NextLevel = 100},
     [2] = {NextLevel = 200},
